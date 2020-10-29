@@ -1,10 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/practice-userlogin/golang-userlogin-practice/middlewares"
 
 	"github.com/dgrijalva/jwt-go"
 
@@ -32,27 +33,16 @@ func postUserHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"response": c.MustGet("payload").(string)})
 }
 
-//the middleware
-func authentication() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		fmt.Println("inside Auth")
-		firstname := c.PostForm("firstname")
-		accessToken := c.GetHeader("access_token")
-		c.Set("payload", "this is the payload")
-
-		fmt.Printf("%s\n", firstname)
-		fmt.Printf("%s\n", accessToken)
-	}
-}
-
 type userClaim struct {
 	jwt.StandardClaims
 	Firstname string `json:"firstname"`
 }
 
 func loginHandler(c *gin.Context) {
+	//expiration time initialization; this means expires in 1 hour
 	expirationTime := time.Duration(1) * time.Hour
 
+	//making claims which basically is the payload
 	claims := userClaim{
 		StandardClaims: jwt.StandardClaims{
 			Issuer:    "budi",
@@ -61,13 +51,19 @@ func loginHandler(c *gin.Context) {
 		Firstname: "Bob",
 	}
 
+	//creating the token, specifying the signing method
 	token := jwt.NewWithClaims(
 		jwt.SigningMethodHS256,
 		claims,
 	)
 
-	var jwtsecretkey = []byte("ini jwt secret")
+	//creating secret key
+	var jwtsecretkey = []byte("inijwtsecretdsadasf")
+
+	//signing the token with secret key
 	signedToken, err := token.SignedString(jwtsecretkey)
+
+	//error catcher
 	if err != nil {
 		result := gin.H{
 			"message": "Wrong ID/Password",
@@ -76,6 +72,7 @@ func loginHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, result)
 	}
 
+	//response
 	c.JSON(http.StatusOK, signedToken)
 }
 
@@ -95,7 +92,7 @@ func main() {
 	server.GET("/", loginHandler)
 
 	//this is setting up middleware
-	apiRoutes := server.Group("/api", authentication())
+	apiRoutes := server.Group("/api", middlewares.Authentication())
 	{
 		apiRoutes.POST("/user", postUserHandler)
 	}
