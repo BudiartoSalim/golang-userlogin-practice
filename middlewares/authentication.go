@@ -3,6 +3,7 @@ package middlewares
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
@@ -14,45 +15,35 @@ var jwtsecretkey = []byte("inijwtsecretdsadasf")
 func Authentication() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		accessToken := c.GetHeader("access_token")
-
-		//jwt verify
-		/* 		token, err := jwt.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
-		if jwt.GetSigningMethod("HS256") != token.Method {
-			return nil, fmt.Errorf("Invalid signing method")
-		}
-		return jwtsecretkey, nil
-		}) */
-
-		tokenString := accessToken[len("Bearer "):]
-		fmt.Println("hehehey")
-		fmt.Printf("tokenString: %v \n %T \n", tokenString, tokenString)
+		tokenString := strings.Replace(accessToken, "Bearer ", "", -1)
 
 		parsedToken, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			if method, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("Invalid Signing Method")
+			} else if method != jwt.SigningMethodHS256 {
 				return nil, fmt.Errorf("Invalid Signing Method")
 			}
 			return jwtsecretkey, nil
 		})
 
-		//claims itu istilah buat payload disini
-		if parsedToken.Valid {
+		if err != nil {
+			result := gin.H{
+				"message": "Auth Fail",
+				"error":   err.Error(),
+			}
+			c.JSON(http.StatusUnauthorized, result)
+		}
+
+		claims, ok := parsedToken.Claims.(jwt.MapClaims)
+
+		if !ok || !parsedToken.Valid {
 			result := gin.H{
 				"message": "Unauthorized",
 				"error":   err.Error(),
 			}
 			c.JSON(http.StatusUnauthorized, result)
-			c.Abort()
 		} else {
-			claims, ok := parsedToken.Claims.(jwt.MapClaims)
-			if ok {
-				c.Set("payload", claims)
-			} else {
-				result := gin.H{
-					"message": "Unauthorized",
-					"error":   err.Error(),
-				}
-				c.JSON(http.StatusUnauthorized, result)
-			}
+			c.JSON(http.StatusOK, claims)
 		}
 	}
 }
